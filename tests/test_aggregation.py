@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from python_funcs.aggregation import f_mean, f_quantile, f_wmean, f_wquantile
+from python_funcs.aggregation import f_mean, f_quantile, f_wmean, f_wquantile, f_wsum
 
 
 # --- f_mean tests ---
@@ -173,6 +173,78 @@ class TestFWmean:
         weights = pd.Series([1.0])
         agg_fn = f_wmean(weights)
         assert agg_fn.__name__ == "wmean"
+
+
+# --- f_wsum tests ---
+
+class TestFWsum:
+    def test_equal_weights(self):
+        values = pd.Series([2.0, 4.0, 6.0], index=[0, 1, 2])
+        weights = pd.Series([1.0, 1.0, 1.0], index=[0, 1, 2])
+        agg_fn = f_wsum(weights)
+        assert agg_fn(values) == pytest.approx(12.0)
+
+    def test_unequal_weights(self):
+        values = pd.Series([2.0, 4.0, 6.0], index=[0, 1, 2])
+        weights = pd.Series([1.0, 0.0, 0.0], index=[0, 1, 2])
+        agg_fn = f_wsum(weights)
+        assert agg_fn(values) == pytest.approx(2.0)
+
+    def test_known_weighted_sum(self):
+        values = pd.Series([10.0, 20.0], index=[0, 1])
+        weights = pd.Series([3.0, 1.0], index=[0, 1])
+        agg_fn = f_wsum(weights)
+        # 10*3 + 20*1 = 50
+        assert agg_fn(values) == pytest.approx(50.0)
+
+    def test_all_nan(self):
+        values = pd.Series([np.nan, np.nan], index=[0, 1])
+        weights = pd.Series([1.0, 1.0], index=[0, 1])
+        agg_fn = f_wsum(weights, ignore_na=True)
+        assert np.isnan(agg_fn(values))
+
+    def test_nan_value_returns_nan_by_default(self):
+        values = pd.Series([np.nan, 10.0, 20.0], index=[0, 1, 2])
+        weights = pd.Series([5.0, 1.0, 1.0], index=[0, 1, 2])
+        agg_fn = f_wsum(weights)
+        assert np.isnan(agg_fn(values))
+
+    def test_nan_weight_returns_nan_by_default(self):
+        values = pd.Series([10.0, 20.0, 30.0], index=[0, 1, 2])
+        weights = pd.Series([1.0, np.nan, 1.0], index=[0, 1, 2])
+        agg_fn = f_wsum(weights)
+        assert np.isnan(agg_fn(values))
+
+    def test_ignore_na_drops_nan_values(self):
+        values = pd.Series([np.nan, 10.0, 20.0], index=[0, 1, 2])
+        weights = pd.Series([5.0, 2.0, 3.0], index=[0, 1, 2])
+        agg_fn = f_wsum(weights, ignore_na=True)
+        # After dropping index 0: 10*2 + 20*3 = 80
+        assert agg_fn(values) == pytest.approx(80.0)
+
+    def test_ignore_na_drops_nan_weights(self):
+        values = pd.Series([10.0, 20.0, 30.0], index=[0, 1, 2])
+        weights = pd.Series([1.0, np.nan, 2.0], index=[0, 1, 2])
+        agg_fn = f_wsum(weights, ignore_na=True)
+        # After dropping index 1: 10*1 + 30*2 = 70
+        assert agg_fn(values) == pytest.approx(70.0)
+
+    def test_zero_sum_weights(self):
+        values = pd.Series([1.0, 2.0], index=[0, 1])
+        weights = pd.Series([0.0, 0.0], index=[0, 1])
+        agg_fn = f_wsum(weights)
+        assert np.isnan(agg_fn(values))
+
+    def test_single_observation(self):
+        values = pd.Series([42.0], index=[0])
+        weights = pd.Series([2.0], index=[0])
+        agg_fn = f_wsum(weights)
+        assert agg_fn(values) == pytest.approx(84.0)
+
+    def test_callable_name(self):
+        weights = pd.Series([1.0])
+        agg_fn = f_wsum(weights)
+        assert agg_fn.__name__ == "wsum"
 
 
 # --- f_wquantile tests ---

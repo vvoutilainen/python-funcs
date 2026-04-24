@@ -98,6 +98,44 @@ def f_wmean(weights, ignore_na=False):
     wmean_.__name__ = "wmean"
     return wmean_
 
+def f_wsum(weights, ignore_na=False):
+    """Weighted sum function for aggregation.
+
+    Parameters
+    ----------
+    weights : pd.Series
+        A series of weights, index-aligned to the original data frame.
+    ignore_na : bool, default False
+        If False, return NaN when any value or weight in the group is NaN.
+        If True, drop rows where either is NaN and compute over the remainder.
+
+    Returns
+    -------
+    callable
+        A function suitable for groupby.agg on a Series.
+    """
+    def wsum_(x):
+        w = weights.loc[x.index]
+        if ignore_na:
+            mask = x.notna() & w.notna()
+            x = x[mask]
+            w = w[mask]
+        else:
+            if x.isna().any() or w.isna().any():
+                return np.nan
+        # If left with no observations, return nan
+        if x.empty:
+            return np.nan
+        # Check that weights sum to above-zero value. If not, return nan.
+        if w.sum() <= 0:
+            return np.nan
+
+        # Calculate weighted sum
+        return np.sum(x.values * w.values)
+
+    wsum_.__name__ = "wsum"
+    return wsum_
+
 def f_wquantile(q, weights, ignore_na=False):
     """Weighted quantile function for aggregation.
 
